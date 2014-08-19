@@ -13,6 +13,8 @@ var Links = require('./app/collections/links');
 var Link = require('./app/models/link');
 var Click = require('./app/models/click');
 
+var dbUtil = require('./lib/dbUtility');
+
 var app = express();
 
 app.set('views', __dirname + '/views');
@@ -25,35 +27,36 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(session({ secret: "secret" }));
 app.use(express.static(__dirname + '/public'));
-app.use(function(req, res, next){
-  if(req.session &&  req.session.userID){
 
-    next();
+// { cookie:
+//   {
+//     path: '/',
+//     _expires: null,
+//     originalMaxAge: null,
+//     httpOnly: true
+//   }
+// }
+
+
+app.get('/', function(req, res) {
+  if(req.session.userID){
+    res.render('index')
   } else {
-    res.render('login');
+    res.redirect('login');
   }
 });
 
-
-app.get('/',
-function(req, res) {
+app.get('/create', function(req, res) {
   res.render('index');
 });
 
-app.get('/create',
-function(req, res) {
-  res.render('index');
-});
-
-app.get('/links',
-function(req, res) {
+app.get('/links', function(req, res) {
   Links.reset().fetch().then(function(links) {
     res.send(200, links.models);
   });
 });
 
-app.post('/links',
-function(req, res) {
+app.post('/links', function(req, res) {
   var uri = req.body.url;
 
   if (!util.isValidUrl(uri)) {
@@ -91,7 +94,8 @@ function(req, res) {
 /************************************************************/
 
 app.get('/logout', function(req, res) {
-  res.send(200, 'goodbye');
+  req.session.destroy();
+  res.render('login');
 });
 
 app.get('/login', function(req, res){
@@ -103,27 +107,33 @@ app.get('/signup', function(req, res){
 });
 
 app.post('/signup', function(req, res){
-  new User({
-    username: req.body.username,
-    password: req.body.password
-  }).save().then(function(newUser) {
-    Users.add(newUser);
-    res.send(200, 'Welcome!');
+  var user = req.body;
+  dbUtil.userExists(user.username, function(exists){
+    if(!exists){
+      dbUtil.saveUser(user, function(user){
+        req.session.regenerate(function(){
+          req.session.userID = user.id;
+          res.render('index');
+        });
+      });
+    } else {
+      res.render('login');
+    }
   });
 });
 
 app.post('/login', function(req, res){
-  new User({
-    username: req.body.username,
-    password: req.body.password
-  }).fetch().then(function(model) {
-    if (!model) res.send(200, 'Nobody here'); // Do something different?
-    else {
-      req.session.regenerate(function(err) {
-        if (err) console.log(err);
-        req.session.userID =  model.id;
-        res.render('index');
+  var user = req.body;
+  dbUtil.authUser(user, function(user){
+    user = user[0];
+    if(user){
+      console.log('login user:', user);
+      req.session.regenerate(function(){
+        req.session.userID = user.id;
+        res.redirect('index');
       });
+    } else {
+      res.render('signup');
     }
   });
 });
