@@ -27,6 +27,12 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(session({ secret: "secret" }));
 app.use(express.static(__dirname + '/public'));
+app.use(function(req, res, next) {
+  if (req.session.userID) {
+    req.loggedIn = true;
+  }
+  next();
+});
 
 // { cookie:
 //   {
@@ -39,7 +45,7 @@ app.use(express.static(__dirname + '/public'));
 
 
 app.get('/', function(req, res) {
-  if(req.session.userID){
+  if(req.loggedIn){
     res.render('index')
   } else {
     res.redirect('login');
@@ -47,16 +53,28 @@ app.get('/', function(req, res) {
 });
 
 app.get('/create', function(req, res) {
+  if (!req.loggedIn) {
+    res.redirect('login');
+    return;
+  }
   res.render('index');
 });
 
 app.get('/links', function(req, res) {
+  if (!req.loggedIn) {
+    res.redirect('login');
+    return;
+  }
   Links.reset().fetch().then(function(links) {
     res.send(200, links.models);
   });
 });
 
 app.post('/links', function(req, res) {
+  if (!req.loggedIn) {
+    res.redirect('login');
+    return;
+  }
   var uri = req.body.url;
 
   if (!util.isValidUrl(uri)) {
@@ -113,11 +131,11 @@ app.post('/signup', function(req, res){
       dbUtil.saveUser(user, function(user){
         req.session.regenerate(function(){
           req.session.userID = user.id;
-          res.render('index');
+          res.redirect('/');
         });
       });
     } else {
-      res.render('login');
+      res.redirect('/login');
     }
   });
 });
@@ -127,13 +145,12 @@ app.post('/login', function(req, res){
   dbUtil.authUser(user, function(user){
     user = user[0];
     if(user){
-      console.log('login user:', user);
       req.session.regenerate(function(){
         req.session.userID = user.id;
-        res.redirect('index');
+        res.redirect('/');
       });
     } else {
-      res.render('signup');
+      res.redirect('/login');
     }
   });
 });
