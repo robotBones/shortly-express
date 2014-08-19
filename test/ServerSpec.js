@@ -63,7 +63,7 @@ describe('', function() {
 
     var requestWithSession = request.defaults({jar: true});
 
-    xbeforeEach(function(done){      // create a user that we can then log-in with
+    beforeEach(function(done){      // create a user that we can then log-in with
       new User({
           'username': 'Phillip',
           'password': 'Phillip'
@@ -77,6 +77,10 @@ describe('', function() {
             'password': 'Phillip'
           }
         };
+
+        User.fetchAll().then(function(collection) {
+          console.log(collection);
+        });
         // login via form and save session info
         requestWithSession(options, function(error, res, body) {
           done();
